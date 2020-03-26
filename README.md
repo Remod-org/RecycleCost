@@ -21,7 +21,7 @@ A small GUI will appear above the recycler loot table to show the requirements f
 ```json
 {
   "Settings": {
-    "costItem": "wood",
+    "costItem": "wood.item",
     "costPerCycle": 1,
     "useEconomics": false,
     "useServerRewards": false,
@@ -30,7 +30,19 @@ A small GUI will appear above the recycler loot table to show the requirements f
 }
 ```
 
-- `costItem` - Item to require for use of the recycler.  The player will need to add this to the recycler to turn it on.  Note that the short prefab name currently must end in .item, such as with wood, glue, bleach, etc.  This will be appended to this value, so do not add it here.
+- `costItem` - Item to require for use of the recycler.  The player will need to add this to the recycler to turn it on, and they will be consumed.  It's probably best not to select recycleables but that may be possible.  Most food items should work.  Working items include:
+  - `wood.item`
+  - `deisel_barrel.item`
+  - `crude_oil.item`
+  - `fuel.lowgrade.item`
+  - `glue.item`
+  - `bleach.item`
+  - `antiradpills.item`
+  - `pumpkin.item`
+  - `pookie.item`
+  - `cactusflesh.item`
+  - `smallwaterbottle.item`
+
 - `costPerCycle` - How much of the costItem to remove for each cycle.  Time to recycle and result of recycling will depend on Rust and any other plugins that may affect production.  This is an integer and should be positive, e.g. 1, 2, etc.
 - `useEconomics` - Set true to use the Economics plugin for costPerCycle.
 - `useServerRewards` - Set true to use the ServerRewards plugin for costPerCycle.
@@ -39,4 +51,3 @@ A small GUI will appear above the recycler loot table to show the requirements f
 ### Future Plans
 
 - We might work on allowing fractions of 1 item per cycle.  This may or may not be possible.
-- Change the costItem configuration to use other non-items, if needed (prefabs that don't end in .item, if any).

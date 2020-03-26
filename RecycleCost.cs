@@ -15,7 +15,7 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("Recycler Cost", "RFC1920", "1.0.0")]
+    [Info("Recycler Cost", "RFC1920", "1.0.1")]
     [Description("Oxide Plugin")]
     class RecycleCost : RustPlugin
     {
@@ -47,14 +47,15 @@ namespace Oxide.Plugins
             lang.RegisterMessages(new Dictionary<string, string>
             {
                 ["requires"] = "Requires {0} {1} per cycle",
-                ["coins"] = "coins"
+                ["rewards"] = "Rewards {0} coin(s) per cycle",
+                ["coins"] = "coin(s)"
             }, this);
         }
 
         void Loaded()
         {
             costPerCycle = GetConfig("Settings", "costPerCycle", 1);
-            costItem = GetConfig("Settings", "costItem", "wood");
+            costItem = GetConfig("Settings", "costItem", "wood.item");
             useEconomics = Convert.ToBoolean(GetConfig("Settings", "useEconomics", "false"));
             useServerRewards = Convert.ToBoolean(GetConfig("Settings", "useServerRewards", "false"));
             recycleReward = Convert.ToBoolean(GetConfig("Settings", "recycleReward", "false"));
@@ -71,7 +72,7 @@ namespace Oxide.Plugins
         protected override void LoadDefaultConfig()
         {
             Config["Settings", "costPerCycle"] = 1;
-            Config["Settings", "costItem"] = "wood";
+            Config["Settings", "costItem"] = "wood.item";
             Config["Settings", "useEconomics"] = false;
             Config["Settings", "useServerRewards"] = false;
             Config["Settings", "recycleReward"] = false;
@@ -104,7 +105,7 @@ namespace Oxide.Plugins
         #region Main
         object CanMoveItem(Item item, PlayerInventory playerLoot, uint targetContainer, int targetSlot, int amount)
         {
-            if(item.info.shortname != costItem) return null;
+            if(item.info.name != costItem) return null;
             ItemContainer originalContainer = item.GetRootContainer();
             var rc = originalContainer.entityOwner;
             if(rc == null) return null;
@@ -154,6 +155,9 @@ namespace Oxide.Plugins
             }
             else
             {
+#if DEBUG
+                Puts("Economics and ServerRewards disabled.  Running cost item check!");
+#endif
                 CostItemCheck(recycler, null, true);
             }
             return null;
@@ -177,7 +181,10 @@ namespace Oxide.Plugins
 
         bool CostItemCheck(Recycler recycler, IPlayer player, bool decrement = false)
         {
-            if(player.HasPermission(permRecyleCostBypass)) return true;
+            if(player != null)
+            {
+                if(player.HasPermission(permRecyleCostBypass)) return true;
+            }
 
             for(int i=0;i<6;i++)
             {
@@ -186,7 +193,7 @@ namespace Oxide.Plugins
 #if DEBUG
                 Puts($"{i.ToString()} Found {item.info.name}");
 #endif
-                if(item.info.name == costItem + ".item")
+                if(item.info.name == costItem)
                 {
                     if(item.amount < costPerCycle)
                     {
@@ -246,7 +253,6 @@ namespace Oxide.Plugins
 #endif
                 CuiHelper.DestroyUi(player, RCGUI);
 
-                // Fix end looting removes key, so economics does not cost anything...
                 if(!((entity as Recycler).IsOn() && (useEconomics || useServerRewards)))
                 {
                     rcloot.Remove(entity.net.ID);
@@ -261,11 +267,19 @@ namespace Oxide.Plugins
             CuiElementContainer container = UI.Container(RCGUI, UI.Color("626262", 1f), "0.75 0.554", "0.9465 0.59", true, "Overlay");
             if(useEconomics || useServerRewards)
             {
-                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), Lang("coins")), 18, "0 0", "1 1");
+                if(recycleReward)
+                {
+                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("rewards", null, costPerCycle.ToString()), 18, "0 0", "1 1");
+                }
+                else
+                {
+                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), Lang("coins")), 18, "0 0", "1 1");
+                }
             }
             else
             {
-                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), costItem), 18, "0 0", "1 1");
+                string itemname = costItem.Replace(".item", "");
+                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), itemname), 18, "0 0", "1 1");
             }
 
             CuiHelper.AddUi(player, container);
