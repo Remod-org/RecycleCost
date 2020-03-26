@@ -1,6 +1,6 @@
 ## Recycle Cost (Remod original)
 
-Current version 1.0.0 [Download](https://remod.org/RecycleCost.cs)
+Current version 1.0.1 [Download](https://remod.org/RecycleCost.cs)
 
 Uses Economics, ServerRewards.
 
