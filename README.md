@@ -37,7 +37,6 @@ A small GUI will appear above the recycler loot table to show the requirements f
   - `fuel.lowgrade.item`
   - `glue.item`
   - `bleach.item`
-  - `antiradpills.item`
   - `pumpkin.item`
   - `pookie.item`
   - `cactusflesh.item`
