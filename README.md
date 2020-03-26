@@ -34,7 +34,7 @@ A small GUI will appear above the recycler loot table to show the requirements f
 - `costPerCycle` - How much of the costItem to remove for each cycle.  Time to recycle and result of recycling will depend on Rust and any other plugins that may affect production.  This is an integer and should be positive, e.g. 1, 2, etc.
 - `useEconomics` - Set true to use the Economics plugin for costPerCycle.
 - `useServerRewards` - Set true to use the ServerRewards plugin for costPerCycle.
-- `recycleReward` - Set true to PAY the player in costPerCycle for each recycling output/cycle.
+- `recycleReward` - Set true to PAY the player in costPerCycle for each recycling output/cycle.  This only works for Economics or ServerRewards and not with costItems such as wood.
 
 ### Future Plans
 
