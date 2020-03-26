@@ -32,7 +32,7 @@ A small GUI will appear above the recycler loot table to show the requirements f
 
 - `costItem` - Item to require for use of the recycler.  The player will need to add this to the recycler to turn it on, and they will be consumed.  It's probably best not to select recycleables but that may be possible.  Most food items should work.  Working items include:
   - `wood.item`
-  - `deisel_barrel.item`
+  - `diesel_barrel.item`
   - `crude_oil.item`
   - `fuel.lowgrade.item`
   - `glue.item`
