@@ -14,7 +14,7 @@ You can use Economics or ServerRewards to take from the player's balance instead
 
 To flip the script with Economics or ServerRewards, you can also reward players with X amount of coins for each recycling cycle.
 
-A small GUI will appear above the recyler loot table to show the requirements for recyler use.
+A small GUI will appear above the recycler loot table to show the requirements for recycler use.
 
 ### Configuration
 
