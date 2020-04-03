@@ -15,8 +15,8 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("Recycler Cost", "RFC1920", "1.0.1")]
-    [Description("Oxide Plugin")]
+    [Info("Recycler Cost", "RFC1920", "1.0.2")]
+    [Description("Recycling cost via fuel or Economics/ServerRewards")]
     class RecycleCost : RustPlugin
     {
         #region vars
@@ -47,6 +47,7 @@ namespace Oxide.Plugins
             lang.RegisterMessages(new Dictionary<string, string>
             {
                 ["requires"] = "Requires {0} {1} per cycle",
+                ["fuelslot"] = "(Fuel must be in rightmost slot)",
                 ["rewards"] = "Rewards {0} coin(s) per cycle",
                 ["coins"] = "coin(s)"
             }, this);
@@ -132,6 +133,16 @@ namespace Oxide.Plugins
             return null;
         }
 
+        bool CanRecycle(Recycler recycler, Item item)
+        {
+            if(useEconomics || useServerRewards)
+            {
+                return true;
+            }
+            if(item.info.name == costItem) return false;
+            return true;
+        }
+
         object OnRecycleItem(Recycler recycler, Item item)
         {
             if(!rcloot.ContainsKey(recycler.net.ID)) return null;
@@ -156,8 +167,14 @@ namespace Oxide.Plugins
             else
             {
 #if DEBUG
-                Puts("Economics and ServerRewards disabled.  Running cost item check!");
+                Puts($"Economics and ServerRewards disabled.  Running cost item check for {item.info.name}");
 #endif
+                if(!HasRecycleable(recycler)) recycler.StopRecycling();
+
+//                if(item.info.name == costItem)
+//                {
+//                    return true;
+//                }
                 CostItemCheck(recycler, null, true);
             }
             return null;
@@ -173,10 +190,68 @@ namespace Oxide.Plugins
             }
             else
             {
+                if(!HasRecycleable(recycler))
+                {
+                    recycler.StopRecycling();
+                    return true;
+                }
                 if(CostItemCheck(recycler, player.IPlayer)) return null;
             }
 
             return true;
+        }
+
+        // Verify that something other than our costItem is present
+        bool HasRecycleable(Recycler recycler)
+        {
+#if DEBUG
+            Puts($"Checking for recycleables other than {costItem}.");
+#endif
+            bool found = false;
+            bool foundItem = false;
+            bool empty = true;
+
+            for(int i=0;i<6;i++)
+            {
+                try
+                {
+                    Item item = recycler.inventory.GetSlot(i);
+#if DEBUG
+                    Puts($"Found {item.info.name} in slot {i.ToString()}");
+#endif
+                    if(item.info.name != costItem)
+                    {
+                        found = true;
+                    }
+                    else
+                    {
+                        foundItem = true;
+                    }
+                    empty = false;
+                }
+                catch {}
+            }
+            if(empty)
+            {
+#if DEBUG
+                Puts("Recycler input is empty...");
+#endif
+                return false;
+            }
+            else if(found && foundItem)
+            {
+#if DEBUG
+                Puts($"Found recycleables and {costItem} in this recycler!");
+#endif
+            }
+            else if(found)
+            {
+#if DEBUG
+                Puts($"Did not find anything other than our costItem, {costItem}, in this recycler!");
+#endif
+            }
+
+            return foundItem;
         }
 
         bool CostItemCheck(Recycler recycler, IPlayer player, bool decrement = false)
@@ -263,23 +338,27 @@ namespace Oxide.Plugins
         void rcGUI(BasePlayer player, BaseEntity entity)
         {
             CuiHelper.DestroyUi(player, RCGUI);
+            CuiElementContainer container;
 
-            CuiElementContainer container = UI.Container(RCGUI, UI.Color("626262", 1f), "0.75 0.554", "0.9465 0.59", true, "Overlay");
             if(useEconomics || useServerRewards)
             {
+                container = UI.Container(RCGUI, UI.Color("505048", 1f), "0.725 0.554", "0.9465 0.59", true, "Overlay");
                 if(recycleReward)
                 {
-                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("rewards", null, costPerCycle.ToString()), 18, "0 0", "1 1");
+                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("rewards", null, costPerCycle.ToString()), 16, "0 0", "1 1");
                 }
                 else
                 {
-                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), Lang("coins")), 18, "0 0", "1 1");
+                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), Lang("coins")), 16, "0 0", "1 1");
                 }
             }
             else
             {
+                container = UI.Container(RCGUI, UI.Color("505048", 1f), "0.75 0.554", "0.9465 0.615", true, "Overlay");
+
                 string itemname = costItem.Replace(".item", "");
-                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), itemname), 18, "0 0", "1 1");
+                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("fuelslot", null, costPerCycle.ToString(), itemname), 14, "0 0", "0.98 0.49", TextAnchor.LowerRight);
+                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), itemname), 18, "0 0.52", "1 1");
             }
 
             CuiHelper.AddUi(player, container);
