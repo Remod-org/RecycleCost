@@ -1,37 +1,49 @@
-//#define DEBUG
+#region License (GPL v3)
+/*
+    DESCRIPTION
+    Copyright (c) 2020 RFC1920 <desolationoutpostpve@gmail.com>
+
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
+    as published by the Free Software Foundation; either version 2
+    of the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+    Optionally you can also view the license at <http://www.gnu.org/licenses/>.
+*/
+#endregion License Information (GPL v3)
+#define DEBUG
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Oxide.Core;
-using System.Text;
-using System.Linq;
 using Oxide.Core.Plugins;
-using System.Linq;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System.Globalization;
 using Oxide.Game.Rust.Cui;
 using Oxide.Core.Libraries.Covalence;
+using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Recycler Cost", "RFC1920", "1.0.2")]
+    [Info("Recycler Cost", "RFC1920", "1.0.3")]
     [Description("Recycling cost via fuel or Economics/ServerRewards")]
     class RecycleCost : RustPlugin
     {
         #region vars
         [PluginReference]
-        private Plugin Economics, ServerRewards;
+        private readonly Plugin Economics, ServerRewards;
+        private ConfigData configData;
 
         const string RCGUI = "recyclecost.label";
         private const string permRecyleCostBypass = "recyclecost.bypass";
         private Dictionary<uint, ulong> rcloot = new Dictionary<uint, ulong>();
-
-        private int costPerCycle;
-        private string costItem;
-        private bool useEconomics;
-        private bool useServerRewards;
-        private bool recycleReward;
         #endregion
 
         #region Message
@@ -55,74 +67,85 @@ namespace Oxide.Plugins
 
         void Loaded()
         {
-            costPerCycle = GetConfig("Settings", "costPerCycle", 1);
-            costItem = GetConfig("Settings", "costItem", "wood.item");
-            useEconomics = Convert.ToBoolean(GetConfig("Settings", "useEconomics", "false"));
-            useServerRewards = Convert.ToBoolean(GetConfig("Settings", "useServerRewards", "false"));
-            recycleReward = Convert.ToBoolean(GetConfig("Settings", "recycleReward", "false"));
+            LoadConfigVariables();
         }
 
         void Unload()
         {
-            foreach(BasePlayer player in BasePlayer.activePlayerList)
+            foreach (BasePlayer player in BasePlayer.activePlayerList)
             {
                 CuiHelper.DestroyUi(player, RCGUI);
             }
         }
-
-        protected override void LoadDefaultConfig()
-        {
-            Config["Settings", "costPerCycle"] = 1;
-            Config["Settings", "costItem"] = "wood.item";
-            Config["Settings", "useEconomics"] = false;
-            Config["Settings", "useServerRewards"] = false;
-            Config["Settings", "recycleReward"] = false;
-            SaveConfig();
-        }
         #endregion
 
         #region config
-        private T GetConfig<T>(string name, T defaultValue)
+        private class ConfigData
         {
-            if(Config [name] == null)
-            {
-                return defaultValue;
-            }
-
-            return(T)Convert.ChangeType(Config [name], typeof(T));
+            public Settings Settings;
+            public VersionNumber Version;
+        }
+        class Settings
+        {
+            public int costPerCycle;
+            public string costItem;
+            public bool useEconomics;
+            public bool useServerRewards;
+            public bool recycleReward;
         }
 
-        private T GetConfig<T>(string name, string name2, T defaultValue)
+        protected override void LoadDefaultConfig()
         {
-            if(Config [name, name2] == null)
+            Puts("Creating new config file.");
+            var config = new ConfigData
             {
-                return defaultValue;
-            }
+                Version = Version,
+                Settings = new Settings()
+                {
+                    costPerCycle = 1,
+                    costItem = "wood.item",
+                    useEconomics = false,
+                    useServerRewards = false,
+                    recycleReward = false
+                }
+            };
+            SaveConfig();
+        }
 
-            return(T)Convert.ChangeType(Config [name, name2], typeof(T));
+        private void LoadConfigVariables()
+        {
+            configData = Config.ReadObject<ConfigData>();
+
+            configData.Version = Version;
+            SaveConfig(configData);
+        }
+
+        private void SaveConfig(ConfigData config)
+        {
+            Config.WriteObject(config, true);
         }
         #endregion
 
         #region Main
         object CanMoveItem(Item item, PlayerInventory playerLoot, uint targetContainer, int targetSlot, int amount)
         {
-            if(item.info.name != costItem) return null;
+            if (item.info.name != configData.Settings.costItem) return null;
             ItemContainer originalContainer = item.GetRootContainer();
-            var rc = originalContainer.entityOwner;
-            if(rc == null) return null;
-            if(rc.name.Contains("recycler_static"))
+            BaseEntity rc = originalContainer.entityOwner;
+            if (rc == null) return null;
+            if (rc.name.Contains("recycler_static"))
             {
 #if DEBUG
                 Puts($"Found recycler {rc.net.ID.ToString()}!");
 #endif
-                if(!rcloot.ContainsKey(rc.net.ID))
+                if (!rcloot.ContainsKey(rc.net.ID))
                 {
 #if DEBUG
                     Puts("Not currently managing this recycler.");
 #endif
                     return null;
                 }
-                if((rc as Recycler).IsOn())
+                if ((rc as Recycler).IsOn())
                 {
 #if DEBUG
                     Puts("Recycler is on!");
@@ -135,26 +158,28 @@ namespace Oxide.Plugins
 
         bool CanRecycle(Recycler recycler, Item item)
         {
-            if(useEconomics || useServerRewards)
+            if (configData.Settings.useEconomics || configData.Settings.useServerRewards)
             {
                 return true;
             }
-            if(item.info.name == costItem) return false;
+            if (item.info.name == configData.Settings.costItem) return false;
             return true;
         }
 
         object OnRecycleItem(Recycler recycler, Item item)
         {
-            if(!rcloot.ContainsKey(recycler.net.ID)) return null;
-            if(useEconomics || useServerRewards)
+            if (!rcloot.ContainsKey(recycler.net.ID)) return null;
+            if (configData.Settings.useEconomics || configData.Settings.useServerRewards)
             {
-                var player = FindPlayer(rcloot[recycler.net.ID]);
-                if(recycleReward)
+                BasePlayer player = FindPlayer(rcloot[recycler.net.ID]);
+                if (player.IPlayer.HasPermission(permRecyleCostBypass)) return null;
+
+                if (configData.Settings.recycleReward)
                 {
-                    CheckEconomy(player, (double) costPerCycle, false, true);
+                    CheckEconomy(player, configData.Settings.costPerCycle, false, true);
                     return null;
                 }
-                else if(CheckEconomy(player, (double) costPerCycle, true))
+                else if (CheckEconomy(player, configData.Settings.costPerCycle, true))
                 {
                     return null;
                 }
@@ -169,12 +194,12 @@ namespace Oxide.Plugins
 #if DEBUG
                 Puts($"Economics and ServerRewards disabled.  Running cost item check for {item.info.name}");
 #endif
-                if(!HasRecycleable(recycler)) recycler.StopRecycling();
+                if (!HasRecycleable(recycler)) recycler.StopRecycling();
 
-//                if(item.info.name == costItem)
-//                {
-//                    return true;
-//                }
+                //if (item.info.name == costItem)
+                //{
+                //    return true;
+                //}
                 CostItemCheck(recycler, null, true);
             }
             return null;
@@ -182,20 +207,20 @@ namespace Oxide.Plugins
 
         object OnRecyclerToggle(Recycler recycler, BasePlayer player)
         {
-            if(recycler.IsOn()) return null;
+            if (recycler.IsOn()) return null;
 
-            if(useEconomics || useServerRewards)
+            if (configData.Settings.useEconomics || configData.Settings.useServerRewards)
             {
                 return null;
             }
             else
             {
-                if(!HasRecycleable(recycler))
+                if (!HasRecycleable(recycler))
                 {
                     recycler.StopRecycling();
                     return true;
                 }
-                if(CostItemCheck(recycler, player.IPlayer)) return null;
+                if (CostItemCheck(recycler, player.IPlayer)) return null;
             }
 
             return true;
@@ -205,13 +230,13 @@ namespace Oxide.Plugins
         bool HasRecycleable(Recycler recycler)
         {
 #if DEBUG
-            Puts($"Checking for recycleables other than {costItem}.");
+            Puts($"Checking for recycleables other than {configData.Settings.costItem}.");
 #endif
             bool found = false;
             bool foundItem = false;
             bool empty = true;
 
-            for(int i=0;i<6;i++)
+            for (int i = 0; i < 6; i++)
             {
                 try
                 {
@@ -219,7 +244,7 @@ namespace Oxide.Plugins
 #if DEBUG
                     Puts($"Found {item.info.name} in slot {i.ToString()}");
 #endif
-                    if(item.info.name != costItem)
+                    if (item.info.name != configData.Settings.costItem)
                     {
                         found = true;
                     }
@@ -231,23 +256,23 @@ namespace Oxide.Plugins
                 }
                 catch {}
             }
-            if(empty)
+            if (empty)
             {
 #if DEBUG
                 Puts("Recycler input is empty...");
 #endif
                 return false;
             }
-            else if(found && foundItem)
+            else if (found && foundItem)
             {
 #if DEBUG
-                Puts($"Found recycleables and {costItem} in this recycler!");
+                Puts($"Found recycleables and {configData.Settings.costItem} in this recycler!");
 #endif
             }
-            else if(found)
+            else if (found)
             {
 #if DEBUG
-                Puts($"Did not find anything other than our costItem, {costItem}, in this recycler!");
+                Puts($"Did not find anything other than our costItem, {configData.Settings.costItem}, in this recycler!");
 #endif
             }
 
@@ -256,31 +281,31 @@ namespace Oxide.Plugins
 
         bool CostItemCheck(Recycler recycler, IPlayer player, bool decrement = false)
         {
-            if(player != null)
+            if (player != null)
             {
-                if(player.HasPermission(permRecyleCostBypass)) return true;
+                if (player.HasPermission(permRecyleCostBypass)) return true;
             }
 
-            for(int i=0;i<6;i++)
+            for (int i = 0; i < 6; i++)
             {
                 Item item = recycler.inventory.GetSlot(i);
-                if(item == null) continue;
+                if (item == null) continue;
 #if DEBUG
                 Puts($"{i.ToString()} Found {item.info.name}");
 #endif
-                if(item.info.name == costItem)
+                if (item.info.name == configData.Settings.costItem)
                 {
-                    if(item.amount < costPerCycle)
+                    if (item.amount < configData.Settings.costPerCycle)
                     {
                         return false;
                     }
-                    if(decrement)
+                    if (decrement)
                     {
 #if DEBUG
                         Puts("Decrementing 1 costitem for great justice.");
 #endif
-                        item.amount -= costPerCycle;
-                        if(item.amount <= 0)
+                        item.amount -= configData.Settings.costPerCycle;
+                        if (item.amount <= 0)
                         {
 #if DEBUG
                             Puts("No more fuel!");
@@ -299,13 +324,13 @@ namespace Oxide.Plugins
 
         private object CanLootEntity(BasePlayer player, StorageContainer container)
         {
-            var rc = container.GetComponentInParent<Recycler>() ?? null;
-            if(rc == null) return null;
+            Recycler rc = container.GetComponentInParent<Recycler>() ?? null;
+            if (rc == null) return null;
 
 #if DEBUG
             Puts($"Adding recycler {rc.net.ID.ToString()}");
 #endif
-            if(rcloot.ContainsKey(rc.net.ID))
+            if (rcloot.ContainsKey(rc.net.ID))
             {
                 // if using eco or sw, another player can enter and the cost will shift to that player
                 rcloot.Remove(rc.net.ID);
@@ -318,17 +343,17 @@ namespace Oxide.Plugins
 
         void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
         {
-            if(!rcloot.ContainsKey(entity.net.ID)) return;
-            if(entity == null) return;
+            if (!rcloot.ContainsKey(entity.net.ID)) return;
+            if (entity == null) return;
 
-            if(rcloot[entity.net.ID] == player.userID)
+            if (rcloot[entity.net.ID] == player.userID)
             {
 #if DEBUG
                 Puts($"Removing recycler {entity.net.ID.ToString()}");
 #endif
                 CuiHelper.DestroyUi(player, RCGUI);
 
-                if(!((entity as Recycler).IsOn() && (useEconomics || useServerRewards)))
+                if (!((entity as Recycler).IsOn() && (configData.Settings.useEconomics || configData.Settings.useServerRewards)))
                 {
                     rcloot.Remove(entity.net.ID);
                 }
@@ -340,25 +365,25 @@ namespace Oxide.Plugins
             CuiHelper.DestroyUi(player, RCGUI);
             CuiElementContainer container;
 
-            if(useEconomics || useServerRewards)
+            if (configData.Settings.useEconomics || configData.Settings.useServerRewards)
             {
                 container = UI.Container(RCGUI, UI.Color("505048", 1f), "0.725 0.554", "0.9465 0.59", true, "Overlay");
-                if(recycleReward)
+                if (configData.Settings.recycleReward)
                 {
-                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("rewards", null, costPerCycle.ToString()), 16, "0 0", "1 1");
+                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("rewards", null, configData.Settings.costPerCycle.ToString()), 16, "0 0", "1 1");
                 }
                 else
                 {
-                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), Lang("coins")), 16, "0 0", "1 1");
+                    UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, configData.Settings.costPerCycle.ToString(), Lang("coins")), 16, "0 0", "1 1");
                 }
             }
             else
             {
                 container = UI.Container(RCGUI, UI.Color("505048", 1f), "0.75 0.554", "0.9465 0.615", true, "Overlay");
 
-                string itemname = costItem.Replace(".item", "");
-                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("fuelslot", null, costPerCycle.ToString(), itemname), 14, "0 0", "0.98 0.49", TextAnchor.LowerRight);
-                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, costPerCycle.ToString(), itemname), 18, "0 0.52", "1 1");
+                string itemname = configData.Settings.costItem.Replace(".item", "");
+                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("fuelslot", null, configData.Settings.costPerCycle.ToString(), itemname), 14, "0 0", "0.98 0.49", TextAnchor.LowerRight);
+                UI.Label(ref container, RCGUI, UI.Color("#cccccc", 1f), Lang("requires", null, configData.Settings.costPerCycle.ToString(), itemname), 18, "0 0.52", "1 1");
             }
 
             CuiHelper.AddUi(player, container);
@@ -374,9 +399,9 @@ namespace Oxide.Plugins
         BasePlayer FindPlayer(ulong ID)
         {
             BasePlayer result = null;
-            foreach(BasePlayer current in GetOnlinePlayers())
+            foreach (BasePlayer current in GetOnlinePlayers())
             {
-                if(current.userID == ID) result = current;
+                if (current.userID == ID) result = current;
             }
             return result;
         }
@@ -388,40 +413,40 @@ namespace Oxide.Plugins
             bool foundmoney = false;
 
             // Check Economics first.  If not in use or balance low, check ServerRewards below
-            if(useEconomics && Economics)
+            if (configData.Settings.useEconomics && Economics)
             {
                 balance = (double)Economics?.CallHook("Balance", player.UserIDString);
-                if(balance >= bypass)
+                if (balance >= bypass)
                 {
                     foundmoney = true;
-                    if(withdraw == true)
+                    if (withdraw == true)
                     {
-                        var w = (bool)Economics?.CallHook("Withdraw", player.userID, bypass);
+                        bool w = (bool)Economics?.CallHook("Withdraw", player.userID, bypass);
                         return w;
                     }
-                    else if(deposit == true)
+                    else if (deposit == true)
                     {
-                        var w = (bool)Economics?.CallHook("Deposit", player.userID, bypass);
+                        bool w = (bool)Economics?.CallHook("Deposit", player.userID, bypass);
                     }
                 }
             }
 
             // No money via Economics, or plugin not in use.  Try ServerRewards.
-            if(useServerRewards && ServerRewards)
+            if (configData.Settings.useServerRewards && ServerRewards)
             {
                 object bal = ServerRewards?.Call("CheckPoints", player.userID);
                 balance = Convert.ToDouble(bal);
-                if(balance >= bypass && foundmoney == false)
+                if (balance >= bypass && foundmoney == false)
                 {
                     foundmoney = true;
-                    if(withdraw == true)
+                    if (withdraw == true)
                     {
-                        var w = (bool)ServerRewards?.Call("TakePoints", player.userID, (int)bypass);
+                        bool w = (bool)ServerRewards?.Call("TakePoints", player.userID, (int)bypass);
                         return w;
                     }
-                    else if(deposit == true)
+                    else if (deposit == true)
                     {
-                        var w = (bool)ServerRewards?.Call("AddPoints", player.userID, (int)bypass);
+                        bool w = (bool)ServerRewards?.Call("AddPoints", player.userID, (int)bypass);
                     }
                 }
             }
@@ -506,7 +531,7 @@ namespace Oxide.Plugins
             }
             public static string Color(string hexColor, float alpha)
             {
-                if(hexColor.StartsWith("#"))
+                if (hexColor.StartsWith("#"))
                 {
                     hexColor = hexColor.Substring(1);
                 }
