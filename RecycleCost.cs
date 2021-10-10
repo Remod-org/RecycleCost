@@ -20,7 +20,7 @@
     Optionally you can also view the license at <http://www.gnu.org/licenses/>.
 */
 #endregion License Information (GPL v3)
-#define DEBUG
+//#define DEBUG
 using System;
 using System.Collections.Generic;
 using UnityEngine;
