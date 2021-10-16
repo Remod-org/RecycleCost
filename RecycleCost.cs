@@ -32,7 +32,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Recycler Cost", "RFC1920", "1.0.3")]
+    [Info("Recycler Cost", "RFC1920", "1.0.4")]
     [Description("Recycling cost via fuel or Economics/ServerRewards")]
     class RecycleCost : RustPlugin
     {
@@ -103,7 +103,7 @@ namespace Oxide.Plugins
                 Settings = new Settings()
                 {
                     costPerCycle = 1,
-                    costItem = "wood.item",
+                    costItem = "fuel.lowgrade.item",
                     useEconomics = false,
                     useServerRewards = false,
                     recycleReward = false

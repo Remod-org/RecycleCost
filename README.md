@@ -1,12 +1,12 @@
 ## Recycle Cost (Remod original)
 
-Current version 1.0.1 [Download](https://remod.org/RecycleCost.cs)
+Current version 1.0.4
 
 Uses Economics, ServerRewards.
 
 ### Overview
 
-Recycle Cost allows an admin to charge for static recycler use.  This can be taken as X amount of an item such as wood, glue, bleach as 'fuel'.  The player will have to add this to the recycler input.
+Recycle Cost allows an admin to charge for static recycler use.  This can be taken as X amount of an item such as lowgrade fuel, glue, bleach as 'fuel'.  The player will have to add this to the recycler input.
 
 If using an item, the amount will be removed from the item stack similar to use with a furnace, etc.
 
@@ -21,7 +21,7 @@ A small GUI will appear above the recycler loot table to show the requirements f
 ```json
 {
   "Settings": {
-    "costItem": "wood.item",
+    "costItem": "fuel.lowgrade.item",
     "costPerCycle": 1,
     "useEconomics": false,
     "useServerRewards": false,
@@ -31,7 +31,6 @@ A small GUI will appear above the recycler loot table to show the requirements f
 ```
 
 - `costItem` - Item to require for use of the recycler.  The player will need to add this to the recycler to turn it on, and they will be consumed.  It's probably best not to select recycleables but that may be possible.  Most food items should work.  Working items include:
-  - `wood.item`
   - `diesel_barrel.item`
   - `crude_oil.item`
   - `fuel.lowgrade.item`
@@ -45,7 +44,7 @@ A small GUI will appear above the recycler loot table to show the requirements f
 - `costPerCycle` - How much of the costItem to remove for each cycle.  Time to recycle and result of recycling will depend on Rust and any other plugins that may affect production.  This is an integer and should be positive, e.g. 1, 2, etc.
 - `useEconomics` - Set true to use the Economics plugin for costPerCycle.
 - `useServerRewards` - Set true to use the ServerRewards plugin for costPerCycle.
-- `recycleReward` - Set true to PAY the player in costPerCycle for each recycling output/cycle.  This only works for Economics or ServerRewards and not with costItems such as wood.
+- `recycleReward` - Set true to PAY the player in costPerCycle for each recycling output/cycle.  This only works for Economics or ServerRewards and not with costItems such as fuel.
 
 ### Future Plans
 
