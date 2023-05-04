@@ -31,7 +31,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Recycler Cost", "RFC1920", "1.0.5")]
+    [Info("Recycler Cost", "RFC1920", "1.0.6")]
     [Description("Recycling cost via fuel or Economics/ServerRewards")]
     internal class RecycleCost : RustPlugin
     {
@@ -89,7 +89,7 @@ namespace Oxide.Plugins
             if (rc.name.Contains("recycler_static"))
             {
                 if (configData.Settings.debug) Puts($"Found recycler {rc.net.ID}!");
-                if (!rcloot.ContainsKey(rc.net.ID))
+                if (!rcloot.ContainsKey((uint)rc.net.ID.Value))
                 {
                     if (configData.Settings.debug) Puts("Not currently managing this recycler.");
                     return null;
@@ -118,10 +118,10 @@ namespace Oxide.Plugins
         private object OnItemRecycle(Item item, Recycler recycler)
         {
             Puts("OnItemRecycle works!");
-            if (!rcloot.ContainsKey(recycler.net.ID)) return null;
+            if (!rcloot.ContainsKey((uint)recycler.net.ID.Value)) return null;
             if (configData.Settings.useEconomics || configData.Settings.useServerRewards || configData.Settings.useBankSystem)
             {
-                BasePlayer player = FindPlayerById(rcloot[recycler.net.ID]);
+                BasePlayer player = FindPlayerById(rcloot[(uint)recycler.net.ID.Value]);
                 if (player.IPlayer.HasPermission(permRecyleCostBypass)) return null;
 
                 if (configData.Settings.recycleReward)
@@ -180,12 +180,12 @@ namespace Oxide.Plugins
             if (rc == null) return null;
 
             if (configData.Settings.debug) Puts($"Adding recycler {rc.net.ID}");
-            if (rcloot.ContainsKey(rc.net.ID))
+            if (rcloot.ContainsKey((uint)rc.net.ID.Value))
             {
                 // if using eco or sw, another player can enter and the cost will shift to that player
-                rcloot.Remove(rc.net.ID);
+                rcloot.Remove((uint)rc.net.ID.Value);
             }
-            rcloot.Add(rc.net.ID, player.userID);
+            rcloot.Add((uint)rc.net.ID.Value, player.userID);
 
             rcGUI(player);
             return null;
@@ -194,9 +194,9 @@ namespace Oxide.Plugins
         private void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
         {
             if (entity == null) return;
-            if (!rcloot.ContainsKey(entity.net.ID)) return;
+            if (!rcloot.ContainsKey((uint)entity.net.ID.Value)) return;
 
-            if (rcloot[entity.net.ID] == player.userID)
+            if (rcloot[(uint)entity.net.ID.Value] == player.userID)
             {
                 if (configData.Settings.debug) Puts($"Removing recycler {entity.net.ID}");
                 CuiHelper.DestroyUi(player, RCGUI);
@@ -204,7 +204,7 @@ namespace Oxide.Plugins
                 Recycler realrc = entity as Recycler;
                 if (realrc?.IsOn() == false && (configData.Settings.useEconomics || configData.Settings.useServerRewards || configData.Settings.useBankSystem))
                 {
-                    rcloot.Remove(entity.net.ID);
+                    rcloot.Remove((uint)entity.net.ID.Value);
                 }
             }
         }
