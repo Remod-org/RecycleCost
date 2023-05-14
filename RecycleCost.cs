@@ -31,7 +31,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Recycler Cost", "RFC1920", "1.0.6")]
+    [Info("Recycler Cost", "RFC1920", "1.0.7")]
     [Description("Recycling cost via fuel or Economics/ServerRewards")]
     internal class RecycleCost : RustPlugin
     {
@@ -80,7 +80,7 @@ namespace Oxide.Plugins
         #endregion
 
         #region Main
-        private object CanMoveItem(Item item, PlayerInventory playerLoot, uint targetContainer, int targetSlot, int amount)
+        private object CanMoveItem(Item item, PlayerInventory playerLoot, ItemContainerId targetContainer, int targetSlot, int amount)
         {
             if (item.info.name != configData.Settings.costItem) return null;
             ItemContainer originalContainer = item.GetRootContainer();
