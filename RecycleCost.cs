@@ -1,7 +1,7 @@
 #region License (GPL v2)
 /*
     DESCRIPTION
-    Copyright (c) 2020-2023 RFC1920 <desolationoutpostpve@gmail.com>
+    Copyright (c) 2020 RFC1920 <desolationoutpostpve@gmail.com>
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -20,18 +20,19 @@
     Optionally you can also view the license at <http://www.gnu.org/licenses/>.
 */
 #endregion License Information (GPL v2)
+using Oxide.Core;
+using Oxide.Core.Libraries.Covalence;
+using Oxide.Core.Plugins;
+using Oxide.Game.Rust.Cui;
 using System;
 using System.Collections.Generic;
-using UnityEngine;
-using Oxide.Core.Plugins;
 using System.Globalization;
-using Oxide.Game.Rust.Cui;
-using Oxide.Core.Libraries.Covalence;
-using Oxide.Core;
+using System.Linq;
+using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Recycler Cost", "RFC1920", "1.0.7")]
+    [Info("Recycler Cost", "RFC1920", "1.0.8")]
     [Description("Recycling cost via fuel or Economics/ServerRewards")]
     internal class RecycleCost : RustPlugin
     {
@@ -43,7 +44,7 @@ namespace Oxide.Plugins
 
         private const string RCGUI = "recyclecost.label";
         private const string permRecyleCostBypass = "recyclecost.bypass";
-        private Dictionary<uint, ulong> rcloot = new Dictionary<uint, ulong>();
+        private Dictionary<uint, ulong> rcloot = new();
         #endregion
 
         private string Lang(string key, string id = null, params object[] args) => string.Format(lang.GetMessage(key, this, id), args);
@@ -82,14 +83,14 @@ namespace Oxide.Plugins
         #region Main
         private object CanMoveItem(Item item, PlayerInventory playerLoot, ItemContainerId targetContainer, int targetSlot, int amount)
         {
-            if (item.info.name != configData.Settings.costItem) return null;
-            ItemContainer originalContainer = item.GetRootContainer();
-            BaseEntity rc = originalContainer.entityOwner;
+            if (item?.info.name != configData.Settings.costItem) return null;
+            ItemContainer originalContainer = item?.GetRootContainer();
+            BaseEntity rc = originalContainer?.entityOwner;
             if (rc == null) return null;
             if (rc.name.Contains("recycler_static"))
             {
                 if (configData.Settings.debug) Puts($"Found recycler {rc.net.ID}!");
-                if (!rcloot.ContainsKey((uint)rc.net.ID.Value))
+                if (!rcloot.ContainsKey((uint)rc?.net.ID.Value))
                 {
                     if (configData.Settings.debug) Puts("Not currently managing this recycler.");
                     return null;
@@ -117,31 +118,36 @@ namespace Oxide.Plugins
 
         private object OnItemRecycle(Item item, Recycler recycler)
         {
-            Puts("OnItemRecycle works!");
-            if (!rcloot.ContainsKey((uint)recycler.net.ID.Value)) return null;
+            if (recycler == null) return null;
+            if (item == null) return null;
+            if (!rcloot.Any()) return null;
+            if (!rcloot.ContainsKey((uint)recycler?.net.ID.Value)) return null;
             if (configData.Settings.useEconomics || configData.Settings.useServerRewards || configData.Settings.useBankSystem)
             {
-                BasePlayer player = FindPlayerById(rcloot[(uint)recycler.net.ID.Value]);
-                if (player.IPlayer.HasPermission(permRecyleCostBypass)) return null;
+                BasePlayer player = FindPlayerById(rcloot[(uint)recycler?.net.ID.Value]);
+                if (player != null)
+                {
+                    if (player.IPlayer.HasPermission(permRecyleCostBypass)) return null;
 
-                if (configData.Settings.recycleReward)
-                {
-                    CheckEconomy(player, configData.Settings.costPerCycle, false, true);
-                    return null;
-                }
-                else if (CheckEconomy(player, configData.Settings.costPerCycle, true))
-                {
-                    return null;
-                }
-                else
-                {
-                    recycler.StopRecycling();
-                    return true;
+                    if (configData.Settings.recycleReward)
+                    {
+                        CheckEconomy(player, configData.Settings.costPerCycle, false, true);
+                        return null;
+                    }
+                    else if (CheckEconomy(player, configData.Settings.costPerCycle, true))
+                    {
+                        return null;
+                    }
+                    else
+                    {
+                        recycler.StopRecycling();
+                        return true;
+                    }
                 }
             }
             else
             {
-                if (configData.Settings.debug) Puts($"Economics and ServerRewards disabled.  Running cost item check for {item.info.name}");
+                if (configData.Settings.debug) Puts($"Economics and ServerRewards disabled.  Running cost item check for {item?.info.name}");
                 if (!HasRecycleable(recycler)) recycler.StopRecycling();
 
                 //if (item.info.name == costItem)
@@ -155,6 +161,7 @@ namespace Oxide.Plugins
 
         private object OnRecyclerToggle(Recycler recycler, BasePlayer player)
         {
+            if (recycler == null) return null;
             if (recycler.IsOn()) return null;
 
             if (configData.Settings.useEconomics || configData.Settings.useServerRewards || configData.Settings.useBankSystem)
@@ -165,7 +172,7 @@ namespace Oxide.Plugins
             {
                 if (!HasRecycleable(recycler))
                 {
-                    recycler.StopRecycling();
+                    recycler?.StopRecycling();
                     return true;
                 }
                 if (CostItemCheck(recycler, player.IPlayer)) return null;
@@ -180,12 +187,12 @@ namespace Oxide.Plugins
             if (rc == null) return null;
 
             if (configData.Settings.debug) Puts($"Adding recycler {rc.net.ID}");
-            if (rcloot.ContainsKey((uint)rc.net.ID.Value))
+            if (rcloot.ContainsKey((uint)rc?.net.ID.Value))
             {
                 // if using eco or sw, another player can enter and the cost will shift to that player
-                rcloot.Remove((uint)rc.net.ID.Value);
+                rcloot.Remove((uint)rc?.net.ID.Value);
             }
-            rcloot.Add((uint)rc.net.ID.Value, player.userID);
+            rcloot.Add((uint)rc?.net.ID.Value, player.userID);
 
             rcGUI(player);
             return null;
@@ -194,21 +201,21 @@ namespace Oxide.Plugins
         private void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
         {
             if (entity == null) return;
-            if (!rcloot.ContainsKey((uint)entity.net.ID.Value)) return;
+            if (!rcloot.Any()) return;
+            if (!rcloot.ContainsKey((uint)entity?.net.ID.Value)) return;
 
-            if (rcloot[(uint)entity.net.ID.Value] == player.userID)
+            if (rcloot[(uint)entity?.net.ID.Value] == player?.userID)
             {
-                if (configData.Settings.debug) Puts($"Removing recycler {entity.net.ID}");
+                if (configData.Settings.debug) Puts($"Removing recycler {entity?.net.ID}");
                 CuiHelper.DestroyUi(player, RCGUI);
 
                 Recycler realrc = entity as Recycler;
                 if (realrc?.IsOn() == false && (configData.Settings.useEconomics || configData.Settings.useServerRewards || configData.Settings.useBankSystem))
                 {
-                    rcloot.Remove((uint)entity.net.ID.Value);
+                    rcloot.Remove((uint)entity?.net.ID.Value);
                 }
             }
         }
-
 
         // Verify that something other than our costItem is present
         private bool HasRecycleable(Recycler recycler)
@@ -223,8 +230,8 @@ namespace Oxide.Plugins
                 try
                 {
                     Item item = recycler.inventory.GetSlot(i);
-                    if (configData.Settings.debug) Puts($"Found {item.info.name} in slot {i}");
-                    if (item.info.name != configData.Settings.costItem)
+                    if (configData.Settings.debug) Puts($"Found {item?.info.name} in slot {i}");
+                    if (item?.info.name != configData.Settings.costItem)
                     {
                         found = true;
                     }
@@ -234,7 +241,7 @@ namespace Oxide.Plugins
                     }
                     empty = false;
                 }
-                catch {}
+                catch { }
             }
             if (empty)
             {
@@ -265,9 +272,9 @@ namespace Oxide.Plugins
                 Item item = recycler.inventory.GetSlot(i);
                 if (item == null) continue;
                 if (configData.Settings.debug) Puts($"{i} Found {item.info.name}");
-                if (item.info.name == configData.Settings.costItem)
+                if (item?.info.name == configData.Settings.costItem)
                 {
-                    if (item.amount < configData.Settings.costPerCycle)
+                    if (item?.amount < configData.Settings.costPerCycle)
                     {
                         return false;
                     }
@@ -278,10 +285,10 @@ namespace Oxide.Plugins
                         if (item.amount <= 0)
                         {
                             if (configData.Settings.debug) Puts("No more fuel!");
-                            item.RemoveFromContainer();
-                            recycler.StopRecycling();
+                            item?.RemoveFromContainer();
+                            recycler?.StopRecycling();
                         }
-                        recycler.inventory.MarkDirty();
+                        recycler?.inventory?.MarkDirty();
                     }
                     return true;
                 }
@@ -323,7 +330,7 @@ namespace Oxide.Plugins
         {
             foreach (BasePlayer current in BasePlayer.activePlayerList)
             {
-                if (current.userID == userid)
+                if (current?.userID == userid)
                 {
                     return current;
                 }
